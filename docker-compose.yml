@@ -1,0 +1,21 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: terasi-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: terasiSambal
+      MYSQL_DATABASE: ecommerceTerasi
+    ports:
+      - '3307:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+
+  redis:
+    image: redis:7-alpine
+    container_name: terasi-redis
+    ports:
+      - '6379:6379'
+
+volumes:
+  mysql_data:
