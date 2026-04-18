@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { UserRepository } from './user.repository.js';
 import { UserService } from './user.services.js';
 import { parseOrThrow } from '../validation/parse.js';
-import { UpdateProfileSchema, phoneInput, verifyPhoneOtpInput } from './user.schema.js';
+import { UpdateProfileSchema, createAddressSchema, phoneInput, verifyPhoneOtpInput } from './user.schema.js';
 const userRepo = new UserRepository();
 const userService = new UserService(userRepo);
 
@@ -25,7 +25,8 @@ export async function updateMyProfileHandler(req: Request, res: Response, next: 
     if (!userId) {
       return res.status(401).json({ ok: false, message: 'Unauthorized' });
     }
-    const parsed = parseOrThrow(UpdateProfileSchema, req.body);
+    const { name } = req.body;
+    const parsed = parseOrThrow(UpdateProfileSchema, { name });
     const profile = await userService.updateProfile(userId, parsed);
     res.status(200).json({ ok: true, data: profile });
   } catch (err) {
@@ -64,4 +65,32 @@ export const verifyOtpPhoneVerifikasi = async (req: Request, res: Response, next
   } catch (error) {
     next(error);
   }
+};
+export const deletePhoneUser = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { phone } = req.body;
+    const email = req.user?.email;
+    const id = req.user?.id;
+    if (!email || !id) {
+      return res.status(401).json({ ok: false, message: 'Unauthorized' });
+    }
+    const parsed = parseOrThrow(phoneInput, { phone });
+    await userService.deletePhoneUser(id, email, parsed.phone);
+    res.status(200).json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+};
+export const uploadAvatar = async (req: Request, res: Response) => {
+  const userId = req.user?.id;
+  if (!userId) {
+    return res.status(401).json({ ok: false, message: 'Unauthorized' });
+  }
+  const result = await userService.uploadProfileAvatar(userId, req.file);
+
+  res.status(200).json({
+    success: true,
+    message: 'Foto profile berhasil diupdate',
+    data: result,
+  });
 };

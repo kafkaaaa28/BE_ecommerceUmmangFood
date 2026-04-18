@@ -165,7 +165,7 @@ model User {
   normalizedEmail String   @unique
   emailVerified DateTime  @default(now())// "2026-02-21T10:00:00Z"
   image         String?   // "https://cdn.site/avatar-kafka.png"
-
+imagePublicId  String?
   phone           String?   @unique // "081234567890"
   phoneVerifiedAt DateTime? // "2026-02-21T10:05:00Z"
 
@@ -188,34 +188,102 @@ model User {
 }
 
 model Address {
-  id            String   @id @default(cuid()) // "clx_addr_001"
-  userId        String   // "clx_user_001"
+  id              String   @id @default(cuid())
+  userId          String
 
-  label         String   // "Rumah"
-  recipientName String   // "Kafka"
-  phone         String   @unique // "081234567890"
+  label           String
+  recipientName   String
+  phone           String
 
-  jalan         String   // "Jl. Merdeka No.1"
-  provinsi      String   // "Jawa Barat"
-  kota          String   // "Bandung"
-  kecamatan      String  // "Coblong"
-  kelurahan    String    // "Dago"
-  kodePos   String   @default("ID") // "40135"
+  jalan           String
+  detail          String?   
 
-  destinationId   Int?    // 23
-  destinationLabel String? // "Bandung Kota"
+  provinsi        String
+  kota            String
+  kecamatan       String
+  kelurahan       String
+  kodePos         String?
 
-  isDefault     Boolean  @default(false) // true
+  provinceId      String?
+  cityId          String?
+  districtId      String?
+  subdistrictId   String?
 
-  createdAt     DateTime @default(now()) // "2026-02-21T09:10:00Z"
-  updatedAt     DateTime @updatedAt // "2026-02-21T11:00:00Z"
-  deletedAt     DateTime? // null
+  origin   String?      
+  originLabel String?
+
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
-  @@index([isDefault])
-  @@index([destinationId])
+  @@index([provinceId])
+  @@index([cityId])
+  @@index([districtId])
+  @@index([subdistrictId])
+  @@index([origin])
+}
+
+model Province {
+  id                String   @id @default(cuid())
+  name              String   @unique
+  id_provinsi       String   @unique  // Binderbytes province ID
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  cities            City[]
+
+  @@index([name])
+}
+
+model City {
+  id                String     @id @default(cuid())
+  id_provinsi       String     // Binderbytes province ID (foreign key)
+  name              String
+  id_kabupaten      String     @unique  // Binderbytes city ID (globally unique)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  province          Province   @relation(fields: [id_provinsi], references: [id_provinsi], onDelete: Cascade)
+  districts         District[]
+
+  @@unique([id_provinsi, name])
+  @@index([id_provinsi])
+  @@index([name])
+}
+
+model District {
+  id                String     @id @default(cuid())
+  id_kabupaten      String     // Binderbytes city ID (foreign key)
+  name              String
+  id_kecamatan      String     @unique  // Binderbytes district ID (globally unique)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  city              City       @relation(fields: [id_kabupaten], references: [id_kabupaten], onDelete: Cascade)
+  subdistricts      Subdistrict[]
+
+  @@unique([id_kabupaten, name])
+  @@index([id_kabupaten])
+  @@index([name])
+}
+
+model Subdistrict {
+  id                String     @id @default(cuid())
+  id_kecamatan      String     // Binderbytes district ID (foreign key)
+  name              String
+  id_kelurahan      String     @unique  // Binderbytes subdistrict ID (globally unique)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  district          District   @relation(fields: [id_kecamatan], references: [id_kecamatan], onDelete: Cascade)
+
+  @@unique([id_kecamatan, name])
+  @@index([id_kecamatan])
+  @@index([name])
 }
 
 model StoreSetting {

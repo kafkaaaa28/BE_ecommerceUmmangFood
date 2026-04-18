@@ -25,7 +25,7 @@ export class AuthService {
       await Promise.all([rlRequestOtpByIp.consume(ip), rlRequestOtpByEmail.consume(email)]);
     } catch (err: any) {
       const retryAfter = err.msBeforeNext / 1000;
-      throw new AppError('TOO_MANY_REQUESTS', 429, `Please retry after ${Math.ceil(retryAfter)} seconds`);
+      throw new AppError('TOO_MANY_REQUESTS', 429, `Silakan coba lagi dalam ${Math.ceil(retryAfter)} detik`);
     }
     const user = await this.userRepo.findByNormalizedEmail(email);
     if (user && user.status !== 'ACTIVE') return;
@@ -34,16 +34,20 @@ export class AuthService {
 
   async verifyOtpLogin(email: string, otp: string, ip: string): Promise<AuthResponse> {
     let userId: string | null = null;
-
     try {
-      await Promise.all([rlVerifyOtpByIp.consume(ip), rlVerifyOtpByEmail.consume(email)]);
+      try {
+        await Promise.all([rlRequestOtpByIp.consume(ip), rlRequestOtpByEmail.consume(email)]);
+      } catch (err: any) {
+        const retryAfter = err.msBeforeNext / 1000;
+        throw new AppError('TOO_MANY_REQUESTS', 429, `Silakan coba lagi dalam ${Math.ceil(retryAfter)} detik`);
+      }
       await this.otpService.verifyOtp(email, otp, 'login');
 
       let user = await this.userRepo.findByNormalizedEmail(email);
       if (user) {
         userId = user.id;
         if (user.status !== 'ACTIVE') {
-          throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'ACCOUNT_UNAVAILABLE');
+          throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
         }
       } else {
         user = await this.userRepo.createByNormalizedEmail(email);
@@ -84,7 +88,7 @@ export class AuthService {
         user,
         accessToken,
         refreshToken,
-        accessTokenExpiresInSeconds: 60,
+        accessTokenExpiresInSeconds: 60 * 30,
         refreshTokenExpiresInSeconds: 60 * 60 * 24 * 3,
       };
     } catch (error) {
@@ -114,7 +118,7 @@ export class AuthService {
       });
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
-        console.error('Failed to persist login event', error);
+        console.error('Gagal menyimpan login event', error);
       }
     }
   }
@@ -122,22 +126,21 @@ export class AuthService {
   async refresh(refreshToken: string) {
     const payload = verifyRefreshToken(refreshToken);
     if (payload.type !== 'refresh') {
-      throw new AppError('INVALID_TOKEN', 401, 'Invalid token type');
+      throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Tipe token tidak valid');
     }
     const session = await this.authRepo.getSession(payload.sessionId);
-
     if (!session) {
-      throw new AppError('SESSION_NOT_FOUND', 401, 'Session not found');
+      throw new AppError('SESSION_NOT_FOUND', 401, 'Sesi tidak ditemukan');
     }
     const incomingHash = sha256(refreshToken);
     if (session.refreshTokenHash !== incomingHash || session.tokenVersion !== payload.tokenVersion) {
-      throw new AppError('INVALID_TOKEN', 401, 'Invalid refresh token');
+      throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Refresh token tidak valid');
     }
     const user = await this.userRepo.findById(session.userId);
 
     if (!user) {
       await this.authRepo.deleteSession(payload.sessionId);
-      throw new AppError('USER_NOT_FOUND', 404, 'User not found');
+      throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
     }
 
     const accessToken = signAccessToken({
@@ -156,7 +159,7 @@ export class AuthService {
       },
       accessToken,
       refreshToken,
-      accessTokenExpiresInSeconds: 60,
+      accessTokenExpiresInSeconds: 60 * 30,
       refreshTokenExpiresInSeconds: 60 * 60 * 24 * 3,
     };
   }

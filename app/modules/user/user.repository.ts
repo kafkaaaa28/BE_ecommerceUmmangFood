@@ -1,7 +1,6 @@
 import { prisma } from '../../config/prisma.js';
 import type { CreateLoginEventInput } from './user.types.js';
 import crypto from 'crypto';
-
 export class UserRepository {
   async findById(id: string) {
     return prisma.user.findUnique({
@@ -13,7 +12,7 @@ export class UserRepository {
   async findByNormalizedEmail(normalizedEmail: string) {
     return prisma.user.findUnique({
       where: { normalizedEmail },
-      select: { id: true, email: true, name: true, role: true, status: true },
+      select: { id: true, email: true, name: true, role: true, image: true, status: true },
     });
   }
 
@@ -48,6 +47,7 @@ export class UserRepository {
         phone: true,
         phoneVerifiedAt: true,
         image: true,
+        imagePublicId: true,
         role: true,
         status: true,
         createdAt: true,
@@ -56,30 +56,30 @@ export class UserRepository {
     });
   }
 
-  async updateProfileById(userId: string, input: { name?: string; phone?: string; image?: string; phoneVerifiedAt?: Date | null }) {
+  async updateProfileById(userId: string, input: { name?: string; image?: string; imagePublicId?: string }) {
     return prisma.user.update({
       where: { id: userId },
       data: {
         name: input.name,
-        phone: input.phone,
         image: input.image,
-        phoneVerifiedAt: input.phoneVerifiedAt,
+        imagePublicId: input.imagePublicId,
       },
       select: {
-        id: true,
-        email: true,
         name: true,
-        phone: true,
-        phoneVerifiedAt: true,
-        image: true,
-        role: true,
-        status: true,
-        createdAt: true,
         updatedAt: true,
       },
     });
   }
-
+  async findPhone(phone: string) {
+    return prisma.user.findUnique({
+      where: { phone },
+      select: {
+        id: true,
+        phone: true,
+        phoneVerifiedAt: true,
+      },
+    });
+  }
   async verifyPhoneOtp(phone: string, email: string) {
     return prisma.user.update({
       where: { normalizedEmail: email },
@@ -90,6 +90,17 @@ export class UserRepository {
         phoneVerifiedAt: true,
         createdAt: true,
         updatedAt: true,
+      },
+    });
+  }
+  async DeletePhoneUser(id: string) {
+    return prisma.user.update({
+      where: {
+        id,
+      },
+      data: {
+        phone: null,
+        phoneVerifiedAt: null,
       },
     });
   }
