@@ -1,11 +1,10 @@
 import { prisma } from '../../config/prisma.js';
-import type { CreateLoginEventInput } from './user.types.js';
 import crypto from 'crypto';
 export class UserRepository {
   async findById(id: string) {
     return prisma.user.findUnique({
       where: { id },
-      select: { id: true, email: true, name: true, role: true, status: true },
+      select: { id: true, email: true, name: true, role: true, image: true, status: true },
     });
   }
 
@@ -19,21 +18,7 @@ export class UserRepository {
   async createByNormalizedEmail(normalizedEmail: string) {
     return prisma.user.create({
       data: { normalizedEmail, email: normalizedEmail },
-      select: { id: true, email: true, name: true, role: true, status: true },
-    });
-  }
-
-  async createLoginEvent(input: CreateLoginEventInput) {
-    return prisma.loginEvent.create({
-      data: {
-        id: crypto.randomUUID(),
-        userId: input.userId ?? null,
-        email: input.email ?? null,
-        provider: input.provider,
-        success: input.success,
-        reason: input.reason,
-        ipAddress: input.ipAddress,
-      },
+      select: { id: true, email: true, name: true, role: true, image: true, status: true },
     });
   }
 

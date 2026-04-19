@@ -3,6 +3,7 @@ import { StatusCodes } from 'http-status-codes';
 import jwt from 'jsonwebtoken';
 import { AppError } from '../modules/error/AppError.js';
 import { verifyAccessToken } from '../modules/lib/jwt/jwt.js';
+import { env } from '../config/env.js';
 
 export function requireAccessToken(req: Request, _res: Response, next: NextFunction): void {
   const authorization = req.header('authorization');
@@ -11,7 +12,6 @@ export function requireAccessToken(req: Request, _res: Response, next: NextFunct
     next(new AppError('UNAUTHORIZED', StatusCodes.UNAUTHORIZED, 'Access token is required in the Authorization header as Bearer token '));
     return;
   }
-
   try {
     const payload = verifyAccessToken(token);
 
@@ -41,4 +41,20 @@ export function requireAccessToken(req: Request, _res: Response, next: NextFunct
 
     next(error);
   }
+}
+
+export function requireInternalToken(req: Request, _res: Response, next: NextFunction): void {
+  const internalToken = req.header('x-internal-token');
+
+  if (!internalToken) {
+    next(new AppError('UNAUTHORIZED_INTERNAL', StatusCodes.UNAUTHORIZED, 'Internal token is required'));
+    return;
+  }
+
+  if (internalToken !== env.AUTH_INTERNAL_TOKEN) {
+    next(new AppError('INVALID_INTERNAL_TOKEN', StatusCodes.UNAUTHORIZED, 'Invalid internal token'));
+    return;
+  }
+
+  next();
 }

@@ -1,12 +1,13 @@
-import { rlRequestOtpByEmail, rlRequestOtpByIp, rlVerifyOtpByEmail, rlVerifyOtpByIp } from '../lib/otp/otplimiter.js';
+import { rlRequestOtpByEmail, rlRequestOtpByIp } from '../lib/otp/otplimiter.js';
 import { OtpService } from '../lib/otp/otp.service.js';
 import { UserRepository } from '../user/user.repository.js';
 import type { User } from '../user/user.types.js';
 import { AppError } from '../error/AppError.js';
-import { signAccessToken, signRefreshToken, verifyAccessToken, verifyRefreshToken } from '../lib/jwt/jwt.js';
+import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../lib/jwt/jwt.js';
 import { randomUUID } from 'crypto';
 import { sha256 } from '../lib/hash/hash.js';
 import { AuthRepository } from './auth.repository.js';
+import type { GoogleExchangeInput, LoginEventProvider } from './auth.types.js';
 
 type AuthResponse = {
   user: User;
@@ -53,28 +54,7 @@ export class AuthService {
         user = await this.userRepo.createByNormalizedEmail(email);
         userId = user.id;
       }
-      const sessionId = randomUUID();
-      const tokenVersion = 1;
-
-      const accessToken = signAccessToken({
-        sub: user.id,
-        email: user.email,
-        role: user.role,
-        status: user.status,
-        sessionId,
-      });
-
-      const refreshToken = signRefreshToken({
-        sub: user.id,
-        sessionId,
-        tokenVersion,
-      });
-      await this.authRepo.saveSession(sessionId, {
-        userId: user.id,
-        refreshTokenHash: sha256(refreshToken),
-        tokenVersion,
-        ip: ip,
-      });
+      const session = await this.issueSession(user, ip);
 
       await this.recordLoginEvent({
         userId,
@@ -82,15 +62,10 @@ export class AuthService {
         ipAddress: ip,
         success: true,
         reason: 'LOGIN_SUCCESS',
+        provider: 'EMAIL',
       });
 
-      return {
-        user,
-        accessToken,
-        refreshToken,
-        accessTokenExpiresInSeconds: 60 * 30,
-        refreshTokenExpiresInSeconds: 60 * 60 * 24 * 3,
-      };
+      return session;
     } catch (error) {
       const reason = error instanceof AppError ? (error.code ?? error.message) : 'LOGIN_FAILED_INTERNAL_ERROR';
 
@@ -100,18 +75,111 @@ export class AuthService {
         ipAddress: ip,
         success: false,
         reason,
+        provider: 'EMAIL',
       });
 
       throw error;
     }
   }
 
-  private async recordLoginEvent(params: { userId: string | null; email: string; ipAddress: string; success: boolean; reason: string }) {
+  async loginWithGoogle(input: GoogleExchangeInput, ip: string): Promise<AuthResponse> {
+    let userId: string | null = null;
+
     try {
-      await this.userRepo.createLoginEvent({
+      let user = await this.userRepo.findByNormalizedEmail(input.email);
+
+      if (!user) {
+        user = await this.authRepo.createGoogleUser({
+          normalizedEmail: input.email,
+          name: input.name,
+          image: input.image,
+        });
+      }
+      userId = user.id;
+
+      if (user.status !== 'ACTIVE') {
+        throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
+      }
+      const shouldUpdateName = !user.name && Boolean(input.name);
+      const shouldUpdateImage = !user.image && Boolean(input.image);
+
+      if (shouldUpdateName || shouldUpdateImage) {
+        user = await this.authRepo.updateGoogleUser(user.id, {
+          ...(shouldUpdateName ? { name: input.name } : {}),
+          ...(shouldUpdateImage ? { image: input.image } : {}),
+        });
+      }
+
+      await this.authRepo.upsertOAuthAccount(user.id, input.account);
+
+      const session = await this.issueSession(user, ip);
+
+      await this.recordLoginEvent({
+        userId,
+        email: input.email,
+        ipAddress: ip,
+        success: true,
+        reason: 'LOGIN_SUCCESS',
+        provider: 'GOOGLE',
+      });
+
+      return session;
+    } catch (error) {
+      const reason = error instanceof AppError ? (error.code ?? error.message) : 'LOGIN_FAILED_INTERNAL_ERROR';
+
+      await this.recordLoginEvent({
+        userId,
+        email: input.email,
+        ipAddress: ip,
+        success: false,
+        reason,
+        provider: 'GOOGLE',
+      });
+
+      throw error;
+    }
+  }
+
+  private async issueSession(user: User, ip: string): Promise<AuthResponse> {
+    const sessionId = randomUUID();
+    const tokenVersion = 1;
+
+    const accessToken = signAccessToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      status: user.status,
+      sessionId,
+    });
+
+    const refreshToken = signRefreshToken({
+      sub: user.id,
+      sessionId,
+      tokenVersion,
+    });
+
+    await this.authRepo.saveSession(sessionId, {
+      userId: user.id,
+      refreshTokenHash: sha256(refreshToken),
+      tokenVersion,
+      ip,
+    });
+
+    return {
+      user,
+      accessToken,
+      refreshToken,
+      accessTokenExpiresInSeconds: 60 * 30,
+      refreshTokenExpiresInSeconds: 60 * 60 * 24 * 3,
+    };
+  }
+
+  private async recordLoginEvent(params: { userId: string | null; email: string; ipAddress: string; success: boolean; reason: string; provider: LoginEventProvider }) {
+    try {
+      await this.authRepo.createLoginEvent({
         userId: params.userId,
         email: params.email,
-        provider: 'EMAIL',
+        provider: params.provider,
         success: params.success,
         reason: params.reason,
         ipAddress: params.ipAddress,
@@ -156,6 +224,8 @@ export class AuthService {
         email: user.email,
         name: user.name,
         role: user.role,
+        image: user.image,
+        status: user.status,
       },
       accessToken,
       refreshToken,

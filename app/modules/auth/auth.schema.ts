@@ -31,3 +31,41 @@ export const RefreshBodySchema = z
     refreshToken: z.string().min(20),
   })
   .strict();
+
+const NullableTrimmedString = z
+  .string()
+  .trim()
+  .min(1)
+  .optional()
+  .nullable()
+  .transform((value) => value ?? null);
+
+const NullableUrlString = z
+  .string()
+  .trim()
+  .url()
+  .optional()
+  .nullable()
+  .transform((value) => value ?? null);
+
+export const GoogleExchangeSchema = z
+  .object({
+    email: EmailInputSchema,
+    name: NullableTrimmedString,
+    image: NullableUrlString,
+    account: z
+      .object({
+        type: z.string().trim().min(1),
+        provider: z.string().trim().min(1),
+        providerAccountId: z.string().trim().min(1),
+        refresh_token: NullableTrimmedString,
+        access_token: NullableTrimmedString,
+        expires_at: z.number().int().optional().nullable(),
+        token_type: NullableTrimmedString,
+        scope: NullableTrimmedString,
+        id_token: NullableTrimmedString,
+        session_state: NullableTrimmedString,
+      })
+      .strict(),
+  })
+  .strict();

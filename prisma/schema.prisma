@@ -141,14 +141,14 @@ model Account {
   userId            String // "clx_user_001"
   type              String // "oauth"
   provider          String // "google"
-  providerAccountId String // "1182xxxx"
+  providerAccountId String @map("provider_account_id") // "1182xxxx" 
 
-  refresh_token String? // "rt_abc123"
-  access_token  String? // "at_abc123"
+  refresh_token String? @db.LongText // "rt_abc123"
+  access_token  String? @db.LongText // "at_abc123"
   expires_at    Int?    // 1735689600
   token_type    String? // "Bearer"
   scope         String? // "openid email profile"
-  id_token      String? // "eyJhbGciOi..."
+  id_token      String? @db.LongText // "eyJhbGciOi..."
   session_state String? // "sess_01"
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
