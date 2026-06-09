@@ -1,14 +1,29 @@
-import { prisma } from '../../config/prisma.js';
-import { PaymentGateway, PaymentMethod, PaymentStatus, OrderStatus } from '../../../generated/prisma/client.js';
-import type { MidtransNotification } from './payment.types.js';
-import { mapPaymentStatusToOrderStatus } from './payment.helper.js';
+import { prisma } from "../../config/prisma.js";
+import {
+  PaymentGateway,
+  PaymentMethod,
+  PaymentStatus,
+  OrderStatus,
+} from "../../../generated/prisma/client.js";
+import type { MidtransNotification } from "./payment.types.js";
+import { mapPaymentStatusToOrderStatus } from "./payment.helper.js";
 export class PaymentRepository {
   async getOrderById(orderId: string, buyerId: string) {
     return prisma.order.findFirst({
       where: { id: orderId, buyerId },
       include: {
         payment: true,
-        items: true,
+        items: {
+          include: {
+            variant: {
+              select: {
+                id: true,
+                variantName: true,
+                product: { select: { id: true, name: true } },
+              },
+            },
+          },
+        },
       },
     });
   }
@@ -20,7 +35,12 @@ export class PaymentRepository {
     });
   }
 
-  async upsertPaymentWithOrder(orderId: string, order: any, snapResult: any, expiresAt: Date) {
+  async upsertPaymentWithOrder(
+    orderId: string,
+    order: any,
+    snapResult: any,
+    expiresAt: Date,
+  ) {
     return prisma.$transaction(async (tx) => {
       const payment = await tx.payment.upsert({
         where: { orderId },
@@ -61,7 +81,11 @@ export class PaymentRepository {
       include: { order: true },
     });
   }
-  async syncPaymentStatus(paymentId: string, orderId: string, paymentData: any) {
+  async syncPaymentStatus(
+    paymentId: string,
+    orderId: string,
+    paymentData: any,
+  ) {
     const { status, paidAt, ...rest } = paymentData;
 
     return prisma.$transaction(async (tx) => {
