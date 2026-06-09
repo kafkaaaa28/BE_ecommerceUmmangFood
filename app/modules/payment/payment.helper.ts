@@ -11,7 +11,7 @@ export function resolveStatus(transactionStatus: string, fraudStatus: string) {
 export function mapPaymentStatusToOrderStatus(paymentStatus: PaymentStatus) {
   const map: Partial<Record<PaymentStatus, OrderStatus>> = {
     [PaymentStatus.PAID]: OrderStatus.PROCESSING,
-    [PaymentStatus.EXPIRED]: OrderStatus.CANCELLED,
+    [PaymentStatus.EXPIRED]: OrderStatus.EXPIRED,
     [PaymentStatus.FAILED]: OrderStatus.CANCELLED,
     [PaymentStatus.REFUNDED]: OrderStatus.CANCELLED,
   };

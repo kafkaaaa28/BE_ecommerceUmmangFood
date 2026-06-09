@@ -20,7 +20,7 @@ export const MIDTRANS_METHOD_MAP: Record<string, PaymentMethod> = {
   qris: PaymentMethod.QRIS,
 } as const;
 
-export const TERMINAL_STATUSES = new Set<PaymentStatus>([PaymentStatus.PAID, PaymentStatus.FAILED, PaymentStatus.REFUNDED]);
+export const TERMINAL_STATUSES = new Set<PaymentStatus>([PaymentStatus.PAID, PaymentStatus.FAILED, PaymentStatus.REFUNDED, PaymentStatus.EXPIRED]);
 
 export const PAYMENT_TO_ORDER_STATUS: Partial<Record<PaymentStatus, OrderStatus>> = {
   [PaymentStatus.PAID]: OrderStatus.PROCESSING,

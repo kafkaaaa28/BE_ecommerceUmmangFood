@@ -1,4 +1,6 @@
 import type { Prisma } from "../../../generated/prisma/client.js";
+
+const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3000';
 type OrderWithItems = Prisma.OrderGetPayload<{
   include: {
     items: {
@@ -50,7 +52,9 @@ export function buildSnapPayload(
     },
 
     callbacks: {
-      finish: `${process.env.FRONTEND_URL}/orders/${order.id}/payment/finish`,
+      finish: `${FRONTEND_URL}/orders/${order.id}/payment/finish`,
+      cancel: `${FRONTEND_URL}/orders/${order.id}/payment/cancel`,
+      error: `${FRONTEND_URL}/orders/${order.id}/payment/error`,
     },
   };
 }

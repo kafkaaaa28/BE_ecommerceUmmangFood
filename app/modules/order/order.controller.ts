@@ -34,7 +34,7 @@ export function listMyOrdersHandler(orderService: OrderService) {
     try {
       const buyerId = req.user!.id;
       const query = parseOrThrow(orderListQuerySchema, req.query);
-      const result = await orderService.listMyOrders(buyerId, query.status, query.page, query.limit);
+      const result = await orderService.listMyOrders(buyerId, query.status, query.page, query.limit, query.search);
       res.status(200).json({ ok: true, data: result });
     } catch (error) {
       next(error);
@@ -47,7 +47,7 @@ export function listSellerOrdersHandler(orderService: OrderService) {
     try {
       const sellerId = req.user!.id;
       const query = parseOrThrow(orderListQuerySchema, req.query);
-      const result = await orderService.listSellerOrders(sellerId, query.status, query.page, query.limit);
+      const result = await orderService.listSellerOrders(sellerId, query.status, query.page, query.limit, query.search);
       res.status(200).json({ ok: true, data: result });
     } catch (error) {
       next(error);
