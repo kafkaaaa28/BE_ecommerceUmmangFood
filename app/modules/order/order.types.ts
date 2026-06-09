@@ -23,6 +23,18 @@ export type OrderResponse = {
   total: number;
   expiresAt: Date | null;
   createdAt: Date;
+  paidAt: Date | null;
+  namaPenerima: string;
+  phone: string;
+  jalan: string;
+  kota: string | null;
+  provinsi: string | null;
+  kodePos: string | null;
+  shipCourierCode: string | null;
+  shipServiceCode: string | null;
+  shipEtd: string | null;
+  notes: string | null;
+  buyer: { id: string; name: string | null; email: string } | null;
   items: Array<{
     id: string;
     variantId: string;
@@ -36,6 +48,7 @@ export type OrderResponse = {
   payment: {
     snapToken: string | null;
     checkoutUrl: string | null;
+    status: string | null;
   } | null;
 };
 

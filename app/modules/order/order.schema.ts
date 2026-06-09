@@ -18,6 +18,11 @@ export const createOrderSchema = z.object({
 
 export const orderListQuerySchema = z.object({
   status: z.string().optional(),
+  search: z.string().optional(),
   page: z.coerce.number().int().positive().optional().default(1),
   limit: z.coerce.number().int().positive().max(50).optional().default(10),
+});
+
+export const updateOrderStatusSchema = z.object({
+  status: z.enum(['PROCESSING', 'SHIPPED', 'COMPLETED', 'CANCELLED']),
 });

@@ -7,6 +7,7 @@ export class OrderRepository {
     return prisma.order.findFirst({
       where: { id: orderId, ...(buyerId ? { buyerId } : {}) },
       include: {
+        buyer: { select: { id: true, name: true, email: true } },
         items: {
           include: {
             variant: {
@@ -26,10 +27,71 @@ export class OrderRepository {
     });
   }
 
-  async findByBuyerId(buyerId: string, status?: string, page = 1, limit = 10) {
+  async findBySellerId(orderId: string, sellerId: string) {
+    return prisma.order.findFirst({
+      where: {
+        id: orderId,
+        items: {
+          some: {
+            variant: {
+              product: { createdBy: sellerId },
+            },
+          },
+        },
+      },
+      include: {
+        buyer: { select: { id: true, name: true, email: true } },
+        items: {
+          include: {
+            variant: {
+              select: {
+                id: true,
+                variantName: true,
+                product: { select: { id: true, name: true } },
+                imageUrl: true,
+              },
+            },
+          },
+        },
+        payment: {
+          select: { snapToken: true, checkoutUrl: true, status: true },
+        },
+      },
+    });
+  }
+
+  async updateStatus(orderId: string, status: OrderStatus) {
+    return prisma.order.update({
+      where: { id: orderId },
+      data: { status },
+      include: {
+        buyer: { select: { id: true, name: true, email: true } },
+        items: {
+          include: {
+            variant: {
+              select: {
+                id: true,
+                variantName: true,
+                product: { select: { id: true, name: true } },
+                imageUrl: true,
+              },
+            },
+          },
+        },
+        payment: {
+          select: { snapToken: true, checkoutUrl: true, status: true },
+        },
+      },
+    });
+  }
+
+  async findByBuyerId(buyerId: string, status?: string, page = 1, limit = 10, search?: string) {
     const where: Prisma.OrderWhereInput = { buyerId };
     if (status) {
       where.status = status as OrderStatus;
+    }
+    if (search) {
+      where.code = { contains: search };
     }
 
     const [orders, total] = await Promise.all([
@@ -49,7 +111,7 @@ export class OrderRepository {
     return { orders, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
-  async findBySeller(sellerId: string, status?: string, page = 1, limit = 10) {
+  async findBySeller(sellerId: string, status?: string, page = 1, limit = 10, search?: string) {
     const where: Prisma.OrderWhereInput = {
       items: {
         some: {
@@ -63,6 +125,9 @@ export class OrderRepository {
     };
     if (status) {
       where.status = status as OrderStatus;
+    }
+    if (search) {
+      where.code = { contains: search };
     }
 
     const [orders, total] = await Promise.all([

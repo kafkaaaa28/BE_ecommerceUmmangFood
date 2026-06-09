@@ -86,12 +86,44 @@ export class OrderService {
     return this.toOrderResponse(order);
   }
 
-  async listMyOrders(buyerId: string, status?: string, page = 1, limit = 10) {
-    return this.orderRepo.findByBuyerId(buyerId, status, page, limit);
+  async getSellerOrder(orderId: string, sellerId: string): Promise<OrderResponse> {
+    const order = await this.orderRepo.findBySellerId(orderId, sellerId);
+    if (!order) {
+      throw new AppError('ORDER_NOT_FOUND', 404, 'Order tidak ditemukan');
+    }
+    return this.toOrderResponse(order);
   }
 
-  async listSellerOrders(sellerId: string, status?: string, page = 1, limit = 10) {
-    return this.orderRepo.findBySeller(sellerId, status, page, limit);
+  async updateOrderStatus(orderId: string, sellerId: string, newStatus: OrderStatus): Promise<OrderResponse> {
+    const order = await this.orderRepo.findBySellerId(orderId, sellerId);
+    if (!order) {
+      throw new AppError('ORDER_NOT_FOUND', 404, 'Order tidak ditemukan');
+    }
+
+    const allowed: Record<string, OrderStatus[]> = {
+      PROCESSING: [OrderStatus.SHIPPED],
+      SHIPPED: [OrderStatus.COMPLETED],
+    };
+
+    const transitions = allowed[order.status] ?? [];
+    if (!transitions.includes(newStatus)) {
+      throw new AppError(
+        'INVALID_STATUS_TRANSITION',
+        400,
+        `Tidak bisa mengubah status dari ${order.status} ke ${newStatus}`,
+      );
+    }
+
+    const updated = await this.orderRepo.updateStatus(orderId, newStatus);
+    return this.toOrderResponse(updated);
+  }
+
+  async listMyOrders(buyerId: string, status?: string, page = 1, limit = 10, search?: string) {
+    return this.orderRepo.findByBuyerId(buyerId, status, page, limit, search);
+  }
+
+  async listSellerOrders(sellerId: string, status?: string, page = 1, limit = 10, search?: string) {
+    return this.orderRepo.findBySeller(sellerId, status, page, limit, search);
   }
 
   private toOrderResponse(order: any): OrderResponse {
@@ -104,6 +136,20 @@ export class OrderService {
       total: Number(order.total),
       expiresAt: order.expiresAt,
       createdAt: order.createdAt,
+      paidAt: order.paidAt ?? null,
+      namaPenerima: order.namaPenerima,
+      phone: order.phone,
+      jalan: order.jalan,
+      kota: order.kota,
+      provinsi: order.provinsi,
+      kodePos: order.kodePos,
+      shipCourierCode: order.shipCourierCode,
+      shipServiceCode: order.shipServiceCode,
+      shipEtd: order.shipEtd,
+      notes: order.notes,
+      buyer: order.buyer
+        ? { id: order.buyer.id, name: order.buyer.name, email: order.buyer.email }
+        : null,
       items: order.items.map((item: any) => ({
         id: item.id,
         variantId: item.variant.id,
@@ -118,6 +164,7 @@ export class OrderService {
         ? {
             snapToken: order.payment.snapToken,
             checkoutUrl: order.payment.checkoutUrl,
+            status: order.payment.status,
           }
         : null,
     };
