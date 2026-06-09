@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import * as nsfwjs from 'nsfwjs';
-
+import sharp from 'sharp';
 const require = createRequire(import.meta.url);
 
 type TfjsNodeModule = typeof import('@tensorflow/tfjs-node');
@@ -37,8 +37,20 @@ export async function getNSFWModel() {
 
 export async function classifyImageBuffer(imageBuffer: Buffer) {
   const tf = await getTfModule();
-  const imageTensor = tf.node.decodeImage(imageBuffer, 3);
   const loadedModel = await getNSFWModel();
+
+  if (!imageBuffer || imageBuffer.length === 0) {
+    throw new Error('Image buffer kosong');
+  }
+
+  let normalizedBuffer: Buffer;
+  try {
+    normalizedBuffer = await sharp(imageBuffer).jpeg().toBuffer();
+  } catch {
+    throw new Error('File bukan gambar valid atau format tidak didukung');
+  }
+
+  const imageTensor = tf.node.decodeImage(normalizedBuffer, 3);
 
   try {
     return await loadedModel.classify(imageTensor as any);
@@ -47,7 +59,7 @@ export async function classifyImageBuffer(imageBuffer: Buffer) {
   }
 }
 
-export function isAvatarSafe(predictions: Array<{ className: string; probability: number }>) {
+export function isSafeImage(predictions: Array<{ className: string; probability: number }>) {
   const porn = predictions.find((p) => p.className === 'Porn');
   const hentai = predictions.find((p) => p.className === 'Hentai');
   const sexy = predictions.find((p) => p.className === 'Sexy');
@@ -60,4 +72,8 @@ export function isAvatarSafe(predictions: Array<{ className: string; probability
   if (hentaiProb >= 0.9) return false;
   if (sexyProb >= 0.95 && pornProb > 0.3) return false;
   return true;
+}
+
+export function isAvatarSafe(predictions: Array<{ className: string; probability: number }>) {
+  return isSafeImage(predictions);
 }

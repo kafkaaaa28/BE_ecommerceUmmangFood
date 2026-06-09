@@ -24,7 +24,7 @@ export class OtpService {
     await Promise.all([cache.setOtp(otpIdentifier, otpHash, purpose), cache.resetOtpAttempts(otpIdentifier, purpose)]);
 
     try {
-      await sendEmail({
+      const res = await sendEmail({
         to: email,
         subject: 'Your OTP Code',
         html: OTP_EMAIL_TEMPLATE(otp),

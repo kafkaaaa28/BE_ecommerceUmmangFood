@@ -73,3 +73,9 @@ export const updateAddressSchema = z.object({
   jalan: z.string().min(1, 'Alamat jalan wajib diisi').trim().optional(),
   detail: z.string().trim().nullable().optional(),
 });
+export const createAddressSellerSchema = z.object({
+  districtId: z.string().min(1, 'District ID wajib diisi').trim().nullable(),
+  label: z.string().min(1, 'Label alamat wajib diisi').trim(),
+  storeName: z.string().min(1, 'Nama toko wajib diisi').trim(),
+});
+export type CreateAddressSellerInput = z.infer<typeof createAddressSellerSchema>;

@@ -43,6 +43,27 @@ export function requireAccessToken(req: Request, _res: Response, next: NextFunct
   }
 }
 
+function createRoleMiddleware(allowedRoles: string[], code: string, message: string) {
+  return (req: Request, _res: Response, next: NextFunction): void => {
+    if (!req.user) {
+      next(new AppError('UNAUTHORIZED', StatusCodes.UNAUTHORIZED, 'Access token is required'));
+      return;
+    }
+
+    if (!allowedRoles.includes(req.user.role)) {
+      next(new AppError(code, StatusCodes.FORBIDDEN, message));
+      return;
+    }
+
+    next();
+  };
+}
+
+export const requireSeller = createRoleMiddleware(['SELLER'], 'SELLER_ONLY', 'Seller access required');
+export const requireAdmin = createRoleMiddleware(['ADMIN'], 'ADMIN_ONLY', 'Admin access required');
+
+export const requireSellerOrAdmin = createRoleMiddleware(['SELLER', 'ADMIN'], 'SELLER_OR_ADMIN_ONLY', 'Seller or admin access required');
+
 export function requireInternalToken(req: Request, _res: Response, next: NextFunction): void {
   const internalToken = req.header('x-internal-token');
 

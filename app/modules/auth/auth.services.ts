@@ -1,7 +1,7 @@
 import { rlRequestOtpByEmail, rlRequestOtpByIp } from '../lib/otp/otplimiter.js';
 import { OtpService } from '../lib/otp/otp.service.js';
 import { UserRepository } from '../user/user.repository.js';
-import type { User } from '../user/user.types.js';
+import type { User, UserProfile } from '../user/user.types.js';
 import { AppError } from '../error/AppError.js';
 import { signAccessToken, signRefreshToken, verifyRefreshToken } from '../lib/jwt/jwt.js';
 import { randomUUID } from 'crypto';
@@ -21,6 +21,17 @@ export class AuthService {
   constructor(private readonly userRepo: UserRepository) {}
   otpService = new OtpService();
   authRepo = new AuthRepository();
+  async ensureActiveUser(user: User | null): Promise<User> {
+    if (!user) {
+      throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
+    }
+
+    if (user.status !== 'ACTIVE') {
+      throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
+    }
+
+    return user;
+  }
   async requestOtpLogin(email: string, ip: string): Promise<void> {
     try {
       await Promise.all([rlRequestOtpByIp.consume(ip), rlRequestOtpByEmail.consume(email)]);
@@ -29,7 +40,7 @@ export class AuthService {
       throw new AppError('TOO_MANY_REQUESTS', 429, `Silakan coba lagi dalam ${Math.ceil(retryAfter)} detik`);
     }
     const user = await this.userRepo.findByNormalizedEmail(email);
-    if (user && user.status !== 'ACTIVE') return;
+    await this.ensureActiveUser(user);
     await this.otpService.sendOtp(email, 'login');
   }
 
@@ -47,9 +58,7 @@ export class AuthService {
       let user = await this.userRepo.findByNormalizedEmail(email);
       if (user) {
         userId = user.id;
-        if (user.status !== 'ACTIVE') {
-          throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
-        }
+        await this.ensureActiveUser(user);
       } else {
         user = await this.userRepo.createByNormalizedEmail(email);
         userId = user.id;
@@ -97,9 +106,7 @@ export class AuthService {
       }
       userId = user.id;
 
-      if (user.status !== 'ACTIVE') {
-        throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
-      }
+      await this.ensureActiveUser(user);
       const shouldUpdateName = !user.name && Boolean(input.name);
       const shouldUpdateImage = !user.image && Boolean(input.image);
 
@@ -210,6 +217,7 @@ export class AuthService {
       await this.authRepo.deleteSession(payload.sessionId);
       throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
     }
+    await this.ensureActiveUser(user);
 
     const accessToken = signAccessToken({
       sub: user.id,

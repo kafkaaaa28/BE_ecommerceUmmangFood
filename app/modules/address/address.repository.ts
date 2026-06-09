@@ -1,4 +1,6 @@
 import { prisma } from '../../config/prisma.js';
+import { toBinderbyteDistrictId } from './address.helper.js';
+import type { CreateAddressSellerInput } from './address.schema.js';
 import { type CreateAddressInput, type UpdateAddressInput, type ResponseAddressByUserId } from './address.types.js';
 export class AddressRepository {
   async searchSubdistricts(keyword: string, limit = 20) {
@@ -42,6 +44,7 @@ export class AddressRepository {
     });
   }
   async CreateAddressUser({ input, user }: { input: CreateAddressInput; user: { userId: string } }) {
+    const binderbyteDistrictId = toBinderbyteDistrictId(input.districtId);
     return prisma.address.create({
       data: {
         id: crypto.randomUUID(),
@@ -64,8 +67,8 @@ export class AddressRepository {
         kelurahan: input.kelurahan,
 
         kodePos: input.kodePos,
-        origin: input.districtId ?? null,
-        originLabel: `${input.label} - ${input.districtId ?? ''}` || null,
+        origin: binderbyteDistrictId,
+        originLabel: input.kecamatan && input.kota ? `${input.kecamatan}, ${input.kota}` : null,
       },
     });
   }
@@ -138,6 +141,30 @@ export class AddressRepository {
       where: {
         id: addressId,
         userId: userId,
+      },
+    });
+  }
+  async createAddressSeller(input: CreateAddressSellerInput) {
+    const binderbyteDistrictId = toBinderbyteDistrictId(input.districtId);
+
+    return prisma.storeSetting.create({
+      data: {
+        originId: binderbyteDistrictId ?? input.districtId,
+        originLabel: `${input.label} - ${binderbyteDistrictId}`,
+        storeName: input.storeName ?? null,
+      },
+    });
+  }
+  async getAddressSeller() {
+    return prisma.storeSetting.findMany({
+      where: {
+        id: 'store_setting',
+      },
+      select: {
+        id: true,
+        originId: true,
+        originLabel: true,
+        storeName: true,
       },
     });
   }

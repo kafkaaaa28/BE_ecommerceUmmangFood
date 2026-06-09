@@ -1,20 +1,7 @@
 import axios, { AxiosError, type AxiosInstance } from 'axios';
 import { AppError } from '../../error/AppError.js';
 import type { BinderbytesProvince, BinderbytesCity, BinderbytesDistrict, BinderbytesSubdistrict } from './binderbytes.types.js';
-
-const getBinderbytesConfig = () => {
-  const apiKey = process.env.BINDERBYTES_API_KEY;
-
-  if (!apiKey) {
-    throw new AppError('BINDERBYTES_CONFIG_INVALID', 500, 'Konfigurasi Binderbytes belum lengkap');
-  }
-
-  return {
-    BINDERBYTES_BASE_URL: 'https://api.binderbyte.com',
-    BINDERBYTES_API_KEY: apiKey,
-  };
-};
-
+import { getBinderbytesConfig } from '../../../utils/api.js';
 export class BinderbytesRepository {
   private readonly http: AxiosInstance;
 
@@ -50,9 +37,9 @@ export class BinderbytesRepository {
     } catch (error: any) {
       if (error.response?.status === 404) {
         console.warn(`Cities not found for province ID ${id_provinsi}, skipping.`);
-        return []; // safe fallback
+        return [];
       }
-      this.handleRequestError(error); // untuk error lain tetap throw
+      this.handleRequestError(error);
     }
   }
 
@@ -65,9 +52,9 @@ export class BinderbytesRepository {
     } catch (error: any) {
       if (error.response?.status === 404) {
         console.warn(`Districts not found for city ID ${id_kabupaten}, skipping.`);
-        return []; // safe fallback
+        return [];
       }
-      this.handleRequestError(error); // untuk error lain tetap throw
+      this.handleRequestError(error);
     }
   }
 
@@ -82,9 +69,9 @@ export class BinderbytesRepository {
     } catch (error: any) {
       if (error.response?.status === 404) {
         console.warn(`Subdistricts not found for district ID ${id_kecamatan}, skipping.`);
-        return []; // safe fallback
+        return [];
       }
-      this.handleRequestError(error); // untuk error lain tetap throw
+      this.handleRequestError(error);
     }
   }
 
@@ -98,13 +85,6 @@ export class BinderbytesRepository {
     return cities.find((item) => Number(item.id) === Number(id_kabupaten)) ?? null;
   }
 
-  /**
-   * Get shipping cost dari Binderbytes
-   * @param originCity ID kota asal (Binderbytes ID)
-   * @param destinationCity ID kota tujuan (Binderbytes ID)
-   * @param weight Berat dalam gram
-   * @param courier Kode kurir (jne, pos, tiki, exactly, grab, dll)
-   */
   async getCost(originCity: string, destinationCity: string, weight: string, courier: string): Promise<any[]> {
     if (!courier || courier.trim().length === 0) {
       throw new AppError('COURIER_INVALID', 400, 'Kode kurir tidak valid');
@@ -121,7 +101,6 @@ export class BinderbytesRepository {
         },
       });
 
-      // Transform Binderbytes response to standard format
       const data = response.data?.value ?? [];
 
       if (Array.isArray(data)) {

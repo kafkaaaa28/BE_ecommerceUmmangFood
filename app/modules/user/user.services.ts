@@ -6,33 +6,46 @@ import { OtpService } from '../lib/otp/otp.service.js';
 import { classifyImageBuffer, isAvatarSafe } from '../image/image.services.js';
 import { uploadBufferToCloudinary } from '../../utils/upload-to-cloudinary.js';
 import cloudinary from '../../config/cloudinary.js';
-
+import { AuthService } from '../auth/auth.services.js';
 type UpdateProfileInput = {
   name: string;
 };
 
 export class UserService {
-  constructor(private readonly userRepo: UserRepository) {}
-  otpService = new OtpService();
+  private otpService: OtpService;
+  private authService: AuthService;
+  constructor(private readonly userRepo: UserRepository) {
+    this.otpService = new OtpService();
+    this.authService = new AuthService(userRepo);
+  }
+  async getUserById(id: string) {
+    const user = await this.userRepo.findById(id);
+    await this.authService.ensureActiveUser(user);
+    return user;
+  }
   async getProfile(userId: string) {
     const user = await this.userRepo.findProfileById(userId);
-    if (!user) throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
-    if (user.status !== 'ACTIVE') throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
+
+    await this.authService.ensureActiveUser(user);
     return user;
   }
 
   async updateProfile(userId: string, input: UpdateProfileInput) {
     const user = await this.userRepo.findProfileById(userId);
-    if (!user) throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
-    if (user.status !== 'ACTIVE') throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
-
+    await this.authService.ensureActiveUser(user);
     return await this.userRepo.updateProfileById(userId, input);
   }
   async uploadProfileAvatar(userId: string, file?: Express.Multer.File) {
     const user = await this.userRepo.findProfileById(userId);
-    if (!user) throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
-    if (user.status !== 'ACTIVE') throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
-    if (!file) throw new AppError('FILE_REQUIRED', 400, 'Foto profile wajib diupload');
+    const saveUser = await this.authService.ensureActiveUser(user);
+
+    if (!file) {
+      throw new AppError('FILE_REQUIRED', 400, 'Foto profile wajib diupload pada field `avatar` dalam format JPG, PNG, atau WEBP dengan ukuran maksimal 2 MB', {
+        field: 'avatar',
+        allowedFormats: 'JPG, PNG, atau WEBP',
+        maxFileSizeMB: 2,
+      });
+    }
 
     const processedBuffer = await sharp(file.buffer).rotate().resize(512, 512, { fit: 'cover' }).jpeg({ quality: 82 }).toBuffer();
 
@@ -41,21 +54,23 @@ export class UserService {
       throw new AppError('INAPPROPRIATE_IMAGE', 422, 'Foto profile terdeteksi mengandung konten yang tidak diizinkan');
     }
 
-    const oldImagePublicId = user.imagePublicId;
+    const oldImagePublicId = saveUser.imagePublicId;
+
     const uploaded = await uploadBufferToCloudinary(processedBuffer, `user-${userId}`);
+    console.log('Uploaded image to Cloudinary:', uploaded);
 
     const updatedUser = await this.userRepo.updateProfileById(userId, {
       image: uploaded.secure_url,
       imagePublicId: uploaded.public_id,
     });
+    console.log('Updated user profile with new avatar:', updatedUser);
 
-    if (oldImagePublicId) {
+    if (oldImagePublicId && oldImagePublicId !== uploaded.public_id) {
       await cloudinary.uploader.destroy(oldImagePublicId).catch(() => null);
     }
 
     return updatedUser;
   }
-
   async requestPhoneVerificationOtp(email: string, phone: string, ip: string) {
     try {
       await Promise.all([rlRequestOtpByIp.consume(ip), rlRequestOtpByEmail.consume(email)]);
@@ -65,18 +80,14 @@ export class UserService {
     }
 
     const user = await this.userRepo.findByNormalizedEmail(email);
-    if (!user) {
-      throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
-    }
-
-    if (user.status !== 'ACTIVE') {
-      throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
-    }
+    const saveUser = await this.authService.ensureActiveUser(user);
     const existingPhoneOwner = await this.userRepo.findPhone(phone);
-    if (existingPhoneOwner && existingPhoneOwner.id !== user.id) {
+    console.log('Existing phone owner for phone:', phone, existingPhoneOwner ? `User ID: ${existingPhoneOwner.id}` : 'None'); // Debug log
+    if (existingPhoneOwner && existingPhoneOwner.id !== saveUser.id) {
       throw new AppError('PHONE_ALREADY_USED', 409, 'Nomor telepon sudah digunakan');
     }
     const identifier = `${email}:${phone}`;
+
     await this.otpService.sendOtp(email, 'phone_verification', identifier);
   }
   async verifyPhoneOtp(phone: string, email: string, otp: string, ip: string) {
@@ -88,15 +99,9 @@ export class UserService {
     }
 
     const user = await this.userRepo.findByNormalizedEmail(email);
-    if (!user) {
-      throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
-    }
-
-    if (user.status !== 'ACTIVE') {
-      throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
-    }
+    const saveUser = await this.authService.ensureActiveUser(user);
     const existingPhoneOwner = await this.userRepo.findPhone(phone);
-    if (existingPhoneOwner && existingPhoneOwner.id !== user.id) {
+    if (existingPhoneOwner && existingPhoneOwner.id !== saveUser.id) {
       throw new AppError('PHONE_ALREADY_USED', 409, 'Nomor telepon sudah digunakan');
     }
     const identifier = `${email}:${phone}`;
@@ -107,13 +112,7 @@ export class UserService {
   async deletePhoneUser(id: string, email: string, phone: string) {
     const user = await this.userRepo.findByNormalizedEmail(email);
 
-    if (!user) {
-      throw new AppError('USER_NOT_FOUND', 404, 'User tidak ditemukan');
-    }
-
-    if (user.status !== 'ACTIVE') {
-      throw new AppError('ACCOUNT_UNAVAILABLE', 403, 'Akun tidak tersedia');
-    }
+    await this.authService.ensureActiveUser(user);
 
     const findPhone = await this.userRepo.findPhone(phone);
 

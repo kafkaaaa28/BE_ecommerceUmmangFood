@@ -4,5 +4,13 @@ export type User = {
   name: string | null;
   role: string;
   image: string | null;
-  status: string;
+  imagePublicId?: string | null;
+  status: UserStatus;
+};
+export type UserStatus = 'ACTIVE' | 'SUSPENDED';
+export type UserProfile = User & {
+  phone: string | null;
+  imagePublicId: string | null;
+  createdAt: Date;
+  updatedAt: Date;
 };

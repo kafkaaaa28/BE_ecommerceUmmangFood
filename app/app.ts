@@ -6,15 +6,18 @@ import addressRoutes from './modules/address/address.routes.js';
 import globalErrorHandler from './modules/error/ErrorRequestHandler.js';
 import { requestId } from './middleware/request-id.js';
 import locationRoutes from './modules/address/location/location.routes.js';
+import productRoutes from './modules/product/product.routes.js';
+import shippingRoutes from './modules/shipping/shipping.route.js';
+import paymentRoutes from './modules/payment/payment.routes.js';
 export const app = express();
-
+import publicProductRoutes from './modules/product/product.public.routes.js';
 const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? '1');
 if (Number.isInteger(trustProxyHops) && trustProxyHops > 0) {
   app.set('trust proxy', trustProxyHops);
 }
 
 const corsOptions = {
-  origin: ['http://192.168.100.230:3000', 'http://localhost:3000', 'http://192.168.100.230:5000', 'https://absensi-fe-project.vercel.app'],
+  origin: ['http://192.168.100.230:3000', 'http://127.0.0.1:3000', 'http://192.168.100.230:5000', 'https://absensi-fe-project.vercel.app'],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   credentials: true,
 };
@@ -26,6 +29,10 @@ app.use('/api/auth', authRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/addresses', addressRoutes);
 app.use('/api/locations', locationRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/public', publicProductRoutes);
+app.use('/api/shipping', shippingRoutes);
+app.use('/api/payment', paymentRoutes);
 app.use(globalErrorHandler);
 
 export default app;

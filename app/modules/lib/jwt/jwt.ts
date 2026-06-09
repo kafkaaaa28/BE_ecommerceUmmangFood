@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import { env } from '../../../config/env.js';
+import { AppError } from '../../error/AppError.js';
 
 export type AccessTokenPayload = {
   sub: string;
@@ -30,5 +31,15 @@ export function verifyAccessToken(token: string): AccessTokenPayload {
 }
 
 export function verifyRefreshToken(token: string): RefreshTokenPayload {
-  return jwt.verify(token, env.JWT_REFRESH_SECRET) as RefreshTokenPayload;
+  try {
+    return jwt.verify(token, env.JWT_REFRESH_SECRET) as RefreshTokenPayload;
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new AppError('REFRESH_TOKEN_EXPIRED', 401, 'Refresh token has expired');
+    }
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw new AppError('INVALID_REFRESH_TOKEN', 401, 'Invalid refresh token');
+    }
+    throw error;
+  }
 }

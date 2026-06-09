@@ -6,6 +6,19 @@ import { UpdateProfileSchema, createAddressSchema, phoneInput, verifyPhoneOtpInp
 const userRepo = new UserRepository();
 const userService = new UserService(userRepo);
 
+type GetUserByIdParams = {
+  id: string;
+};
+export async function getUserByIdHandler(req: Request, res: Response, next: NextFunction) {
+  try {
+    const { id } = req.params as GetUserByIdParams;
+    const user = await userService.getUserById(id);
+    res.status(200).json({ ok: true, data: user });
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function getMyProfileHandler(req: Request, res: Response, next: NextFunction) {
   try {
     const userId = req.user?.id;
@@ -43,6 +56,7 @@ export const requestOtpPhoneVerifikasi = async (req: Request, res: Response, nex
     }
     const ip = req.ip;
     const parsed = parseOrThrow(phoneInput, { phone });
+
     await userService.requestPhoneVerificationOtp(email, parsed.phone, String(ip));
     res.status(200).json({ ok: true });
   } catch (error) {

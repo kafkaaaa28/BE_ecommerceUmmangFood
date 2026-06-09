@@ -3,6 +3,7 @@ import { AddressRepository } from './address.repository.js';
 import { getAddressCache, setAddressCache } from '../cache/addressCache.js';
 import { UserRepository } from '../user/user.repository.js';
 import type { CreateAddressInput, UpdateAddressInput, ResponseAddressByUserId } from './address.types.js';
+import type { CreateAddressSellerInput } from './address.schema.js';
 export class AddressService {
   constructor(private readonly addressRepo: AddressRepository) {}
 
@@ -133,5 +134,14 @@ export class AddressService {
       }
       throw new AppError('DELETE_ADDRESS_FAILED', 500, 'Gagal menghapus alamat');
     }
+  }
+  async createAddressSeller(input: CreateAddressSellerInput, role: string) {
+    if (role !== 'SELLER') {
+      throw new AppError('FORBIDDEN', 403, 'Hanya penjual yang dapat membuat alamat toko');
+    }
+    return await this.addressRepo.createAddressSeller(input);
+  }
+  async getAddressSeller() {
+    return await this.addressRepo.getAddressSeller();
   }
 }

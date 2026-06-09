@@ -14,7 +14,7 @@
 
 import 'dotenv/config';
 import { prisma } from '../app/config/prisma.js';
-import { BinderbytesRepository } from '../app/modules/logistik/binderbytes.repository.js';
+import { BinderbytesRepository } from '../app/modules/address/binderbytes/binderbytes.repository.js';
 
 /* ======================
    UTIL
