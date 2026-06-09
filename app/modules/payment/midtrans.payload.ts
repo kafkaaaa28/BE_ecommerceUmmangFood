@@ -1,11 +1,27 @@
-import type { Prisma, Order } from '../../../generated/prisma/client.js';
+import type { Prisma } from "../../../generated/prisma/client.js";
 type OrderWithItems = Prisma.OrderGetPayload<{
   include: {
-    items: true;
+    items: {
+      include: {
+        variant: {
+          select: {
+            id: true;
+            variantName: true;
+            product: { select: { id: true; name: true } };
+          };
+        };
+      };
+    };
+    payment: true;
   };
 }>;
-export function buildSnapPayload(order: OrderWithItems, expiryMinutes: number = 60) {
-  const expiryDate = _formatMidtransDate(new Date(Date.now() + expiryMinutes * 60 * 1000));
+export function buildSnapPayload(
+  order: OrderWithItems,
+  expiryMinutes: number = 60,
+) {
+  const expiryDate = _formatMidtransDate(
+    new Date(Date.now() + expiryMinutes * 60 * 1000),
+  );
 
   return {
     transaction_details: {
@@ -22,14 +38,14 @@ export function buildSnapPayload(order: OrderWithItems, expiryMinutes: number = 
         first_name: order.namaPenerima,
         phone: order.phone,
         address: order.jalan,
-        city: order.kota ?? '',
-        postal_code: order.kodePos ?? '',
+        city: order.kota ?? "",
+        postal_code: order.kodePos ?? "",
       },
     },
 
     expiry: {
       start_time: _formatMidtransDate(new Date()),
-      unit: 'minutes',
+      unit: "minutes",
       duration: expiryMinutes,
     },
 
@@ -40,17 +56,17 @@ export function buildSnapPayload(order: OrderWithItems, expiryMinutes: number = 
 }
 
 function _buildItemDetails(order: OrderWithItems) {
-  const items = order.items.map((item: any) => ({
+  const items = order.items.map((item) => ({
     id: item.id,
-    name: item.productName?.slice(0, 50) ?? 'Produk',
-    price: Number(item.price),
-    quantity: Number(item.quantity),
+    name: item.variant?.product?.name?.slice(0, 50) ?? "Produk",
+    price: Number(item.unitPrice),
+    quantity: item.qty,
   }));
 
   if (Number(order.shippingFee) > 0) {
     items.push({
-      id: 'SHIPPING',
-      name: `Ongkir (${order.shipCourierCode ?? ''} ${order.shipServiceCode ?? ''})`.trim(),
+      id: "SHIPPING",
+      name: `Ongkir (${order.shipCourierCode ?? ""} ${order.shipServiceCode ?? ""})`.trim(),
       price: Number(order.shippingFee),
       quantity: 1,
     });
@@ -60,10 +76,15 @@ function _buildItemDetails(order: OrderWithItems) {
 }
 
 function _formatMidtransDate(date: Date | number): string {
-  const pad = (n: number) => String(n).padStart(2, '0');
+  const pad = (n: number) => String(n).padStart(2, "0");
   const d = new Date(date);
 
   const wib = new Date(d.getTime() + 7 * 60 * 60 * 1000);
 
-  return [`${wib.getUTCFullYear()}-${pad(wib.getUTCMonth() + 1)}-${pad(wib.getUTCDate())}`, ' ', `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`, ' +0700'].join('');
+  return [
+    `${wib.getUTCFullYear()}-${pad(wib.getUTCMonth() + 1)}-${pad(wib.getUTCDate())}`,
+    " ",
+    `${pad(wib.getUTCHours())}:${pad(wib.getUTCMinutes())}:${pad(wib.getUTCSeconds())}`,
+    " +0700",
+  ].join("");
 }
