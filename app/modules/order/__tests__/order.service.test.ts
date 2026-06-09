@@ -3,7 +3,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.mock('../../../../generated/prisma/client.js', () => {
   const OrderStatus = {
     PENDING_PAYMENT: 'PENDING_PAYMENT',
+    PAID: 'PAID',
     PROCESSING: 'PROCESSING',
+    SHIPPED: 'SHIPPED',
+    COMPLETED: 'COMPLETED',
     CANCELLED: 'CANCELLED',
     EXPIRED: 'EXPIRED',
   };
@@ -50,6 +53,18 @@ const mockCreatedOrder = {
   total: 115000,
   expiresAt: new Date(),
   createdAt: new Date(),
+  paidAt: null,
+  namaPenerima: 'Budi',
+  phone: '08123456789',
+  jalan: 'Jl. Merdeka No. 1',
+  kota: 'Jakarta',
+  provinsi: 'DKI Jakarta',
+  kodePos: '12345',
+  shipCourierCode: 'jne',
+  shipServiceCode: 'REG',
+  shipEtd: '1-2 hari',
+  notes: 'Tolong dibungkus rapih',
+  buyer: { id: 'buyer-1', name: 'Budi', email: 'budi@test.com' },
   items: [
     {
       id: 'item-1',
@@ -77,6 +92,8 @@ describe('OrderService', () => {
     findById: ReturnType<typeof vi.fn>;
     findByBuyerId: ReturnType<typeof vi.fn>;
     findBySeller: ReturnType<typeof vi.fn>;
+    findBySellerId: ReturnType<typeof vi.fn>;
+    updateStatus: ReturnType<typeof vi.fn>;
   };
 
   const validInput = {
@@ -100,6 +117,8 @@ describe('OrderService', () => {
       findById: vi.fn(),
       findByBuyerId: vi.fn(),
       findBySeller: vi.fn(),
+      findBySellerId: vi.fn(),
+      updateStatus: vi.fn(),
     };
     orderService = new OrderService(mockRepo as any);
   });
@@ -234,6 +253,97 @@ describe('OrderService', () => {
 
       await expect(orderService.getOrder('order-x', 'buyer-1')).rejects.toThrow(AppError);
       await expect(orderService.getOrder('order-x', 'buyer-1')).rejects.toMatchObject({
+        code: 'ORDER_NOT_FOUND',
+        status: 404,
+      });
+    });
+  });
+
+  describe('getSellerOrder', () => {
+    it('should return order for seller when found', async () => {
+      mockRepo.findBySellerId.mockResolvedValue(mockCreatedOrder);
+
+      const result = await orderService.getSellerOrder('order-1', 'seller-1');
+
+      expect(result.id).toBe('order-1');
+      expect(mockRepo.findBySellerId).toHaveBeenCalledWith('order-1', 'seller-1');
+    });
+
+    it('should throw AppError when order not found for seller', async () => {
+      mockRepo.findBySellerId.mockResolvedValue(null);
+
+      await expect(orderService.getSellerOrder('order-x', 'seller-1')).rejects.toThrow(AppError);
+      await expect(orderService.getSellerOrder('order-x', 'seller-1')).rejects.toMatchObject({
+        code: 'ORDER_NOT_FOUND',
+        status: 404,
+      });
+    });
+  });
+
+  describe('updateOrderStatus', () => {
+    it('should update PROCESSING to SHIPPED', async () => {
+      const processingOrder = { ...mockCreatedOrder, status: 'PROCESSING' };
+      const shippedOrder = { ...mockCreatedOrder, status: 'SHIPPED' };
+      mockRepo.findBySellerId.mockResolvedValue(processingOrder);
+      mockRepo.updateStatus.mockResolvedValue(shippedOrder);
+
+      const result = await orderService.updateOrderStatus('order-1', 'seller-1', 'SHIPPED' as any);
+
+      expect(result.status).toBe('SHIPPED');
+      expect(mockRepo.updateStatus).toHaveBeenCalledWith('order-1', 'SHIPPED');
+    });
+
+    it('should update SHIPPED to COMPLETED', async () => {
+      const shippedOrder = { ...mockCreatedOrder, status: 'SHIPPED' };
+      const completedOrder = { ...mockCreatedOrder, status: 'COMPLETED' };
+      mockRepo.findBySellerId.mockResolvedValue(shippedOrder);
+      mockRepo.updateStatus.mockResolvedValue(completedOrder);
+
+      const result = await orderService.updateOrderStatus('order-1', 'seller-1', 'COMPLETED' as any);
+
+      expect(result.status).toBe('COMPLETED');
+      expect(mockRepo.updateStatus).toHaveBeenCalledWith('order-1', 'COMPLETED');
+    });
+
+    it('should throw AppError on invalid transition from PROCESSING to COMPLETED', async () => {
+      const processingOrder = { ...mockCreatedOrder, status: 'PROCESSING' };
+      mockRepo.findBySellerId.mockResolvedValue(processingOrder);
+
+      await expect(
+        orderService.updateOrderStatus('order-1', 'seller-1', 'COMPLETED' as any),
+      ).rejects.toThrow(AppError);
+      await expect(
+        orderService.updateOrderStatus('order-1', 'seller-1', 'COMPLETED' as any),
+      ).rejects.toMatchObject({
+        code: 'INVALID_STATUS_TRANSITION',
+        status: 400,
+      });
+    });
+
+    it('should throw AppError on invalid transition from PENDING_PAYMENT to SHIPPED', async () => {
+      const pendingOrder = { ...mockCreatedOrder, status: 'PENDING_PAYMENT' };
+      mockRepo.findBySellerId.mockResolvedValue(pendingOrder);
+
+      await expect(
+        orderService.updateOrderStatus('order-1', 'seller-1', 'SHIPPED' as any),
+      ).rejects.toThrow(AppError);
+      await expect(
+        orderService.updateOrderStatus('order-1', 'seller-1', 'SHIPPED' as any),
+      ).rejects.toMatchObject({
+        code: 'INVALID_STATUS_TRANSITION',
+        status: 400,
+      });
+    });
+
+    it('should throw AppError when order not found', async () => {
+      mockRepo.findBySellerId.mockResolvedValue(null);
+
+      await expect(
+        orderService.updateOrderStatus('order-x', 'seller-1', 'SHIPPED' as any),
+      ).rejects.toThrow(AppError);
+      await expect(
+        orderService.updateOrderStatus('order-x', 'seller-1', 'SHIPPED' as any),
+      ).rejects.toMatchObject({
         code: 'ORDER_NOT_FOUND',
         status: 404,
       });
