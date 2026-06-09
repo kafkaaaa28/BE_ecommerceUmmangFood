@@ -9,6 +9,7 @@ import locationRoutes from './modules/address/location/location.routes.js';
 import productRoutes from './modules/product/product.routes.js';
 import shippingRoutes from './modules/shipping/shipping.route.js';
 import paymentRoutes from './modules/payment/payment.routes.js';
+import { buyerRouter, sellerRouter } from './modules/order/order.routes.js';
 export const app = express();
 import publicProductRoutes from './modules/product/product.public.routes.js';
 const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS ?? '1');
@@ -33,6 +34,8 @@ app.use('/api/products', productRoutes);
 app.use('/api/public', publicProductRoutes);
 app.use('/api/shipping', shippingRoutes);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/orders', buyerRouter);
+app.use('/api/seller/orders', sellerRouter);
 app.use(globalErrorHandler);
 
 export default app;
